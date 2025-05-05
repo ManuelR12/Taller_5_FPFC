@@ -1,139 +1,131 @@
-// fichero: pruebas.sc
-
-import Benchmark._
 import Matrices._
-import org.scalameter._ // Necesario si usaras 'config' directamente aquí, aunque ya está encapsulado.
+import Benchmark._ // ¡Importante importar el paquete Benchmark!
+import scala.collection.parallel.CollectionConverters._ // Para .par en prodPuntoParD
 
-println("--- Inicio de Benchmarks ---")
+// ========================================================================
+// PARTE 1: PRUEBAS FUNCIONALES BÁSICAS (Verificar que compila y da resultados)
+// ========================================================================
+println("--- Pruebas Funcionales Básicas Taller 5 ---")
 
-// --- Configuración ---
-// Define el tamaño de las matrices a probar.
-// ¡IMPORTANTE! Para multMatrizRec, multMatrizRecPar, multStrassen, multStrassenPar
-// 'n' DEBE ser una potencia de 2.
-val n: Int = 128 // Ejemplo: 64, 128, 256. Ajusta según sea necesario.
+// --- Datos de Prueba Pequeños ---
+val n_small_func = 4
+val vals_limit_func = 3
+val m1_func = matrizAlAzar(n_small_func, vals_limit_func)
+val m2_func = matrizAlAzar(n_small_func, vals_limit_func)
+val v1_func = vectorAlAzar(10, vals_limit_func)
+val v2_func = vectorAlAzar(10, vals_limit_func)
 
-// Define el tamaño de los vectores para el producto punto.
-val vectorSize: Int = 1000000 // Un tamaño grande para ver mejor el efecto del paralelismo.
+println("\nMatrices Pequeñas para Pruebas Funcionales:")
+println("m1:"); m1_func.foreach(r => println(r.mkString("\t")))
+println("m2:"); m2_func.foreach(r => println(r.mkString("\t")))
+println(s"\nVectores Pequeños: v1=$v1_func, v2=$v2_func")
 
-println(s"Configuración:")
-println(s" - Tamaño de Matriz (n x n): $n x $n")
-println(s" - Tamaño de Vector (producto punto): $vectorSize")
-// El rango de valores aleatorios se define dentro de matrizAlAzar/vectorAlAzar en el paquete Matrices (actualmente usa 'vals = 2').
+// --- Ejecución Simple de Cada Función ---
+println("\nEjecutando funciones (resultado puede variar por aleatoriedad):")
+val res_multMatriz_func = multMatriz(m1_func, m2_func)
+println(s"multMatriz: OK (devuelve ${res_multMatriz_func.length}x${res_multMatriz_func.head.length})")
+val res_multMatrizPar_func = multMatrizPar(m1_func, m2_func)
+println(s"multMatrizPar: OK (devuelve ${res_multMatrizPar_func.length}x${res_multMatrizPar_func.head.length})")
+val res_multMatrizRec_func = multMatrizRec(m1_func, m2_func)
+println(s"multMatrizRec: OK (devuelve ${res_multMatrizRec_func.length}x${res_multMatrizRec_func.head.length})")
+val res_multMatrizRecPar_func = multMatrizRecPar(m1_func, m2_func) // Sin umbral
+println(s"multMatrizRecPar: OK (devuelve ${res_multMatrizRecPar_func.length}x${res_multMatrizRecPar_func.head.length})")
+val res_multStrassen_func = multStrassen(m1_func, m2_func)
+println(s"multStrassen: OK (devuelve ${res_multStrassen_func.length}x${res_multStrassen_func.head.length})")
+val res_multStrassenPar_func = multStrassenPar(m1_func, m2_func) // Sin umbral
+println(s"multStrassenPar: OK (devuelve ${res_multStrassenPar_func.length}x${res_multStrassenPar_func.head.length})")
+val res_prodPunto_func = prodPunto(v1_func, v2_func)
+println(s"prodPunto: OK (devuelve $res_prodPunto_func)")
+val res_prodPuntoParD_func = prodPuntoParD(v1_func.par, v2_func.par)
+println(s"prodPuntoParD: OK (devuelve $res_prodPuntoParD_func)")
 
-// --- Generación de Datos para compararAlgoritmos ---
-// Generamos un par de matrices aquí para usarlas consistentemente en las comparaciones
-// que utilizan `compararAlgoritmos`. Las funciones `compararMultMatriz` y
-// `compararProdPunto` generan sus propios datos internamente.
-println(s"\nGenerando matrices aleatorias de ${n}x${n} para comparaciones...")
-// Asegúrate de que 'n' sea potencia de 2 si vas a usar Rec o Strassen.
-val m1 = matrizAlAzar(n, 10) // Usamos un rango pequeño para los valores, e.g., 10
-val m2 = matrizAlAzar(n, 10)
-println("Matrices generadas.")
+// Verificación rápida de igualdad (opcional, útil si las entradas no fueran aleatorias)
+// println(s"Func Check multMatriz == multMatrizPar: ${res_multMatriz_func == res_multMatrizPar_func}")
+// println(s"Func Check multMatriz == multMatrizRec: ${res_multMatriz_func == res_multMatrizRec_func}")
+// println(s"Func Check multMatriz == multMatrizRecPar: ${res_multMatriz_func == res_multMatrizRecPar_func}")
+// println(s"Func Check multMatriz == multStrassen: ${res_multMatriz_func == res_multStrassen_func}")
+// println(s"Func Check multMatriz == multStrassenPar: ${res_multMatriz_func == res_multStrassenPar_func}")
+// println(s"Func Check prodPunto == prodPuntoParD: ${res_prodPunto_func == res_prodPuntoParD_func}")
+
+println("\n--- Fin Pruebas Funcionales ---")
 
 
-// --- Ejecución de Benchmarks ---
+// ========================================================================
+// PARTE 2: PRUEBAS DE RENDIMIENTO (BENCHMARKING) PRELIMINARES
+// ========================================================================
+// NOTA: Ejecutar benchmarks en un worksheet puede dar resultados menos
+//       precisos que en una aplicación compilada (`sbt run`).
+//       Estos son resultados preliminares para el informe.
+//       ¡La ejecución puede tardar bastante!
+// ========================================================================
 
-println("\n--- 1. Comparación de Multiplicación Estándar (Secuencial vs Paralela Task) ---")
-try {
-  // CORREGIDO: Añadido '_' a los nombres de los métodos
-  val (tStdSec, tStdParT, speedupStdT) = compararAlgoritmos(multMatriz _, multMatrizPar _)(m1, m2)
-  println(f"  Tiempo Estándar Secuencial : $tStdSec%.4f ms")
-  println(f"  Tiempo Estándar Paralela (Task): $tStdParT%.4f ms")
-  println(f"  Speedup (Sec/ParTask)       : $speedupStdT%.2fx")
-} catch {
-  case e: Throwable => println(s"  ERROR ejecutando benchmark estándar: ${e.getMessage}")
+println("\n--- Pruebas de Rendimiento (Benchmark) ---")
+println("ADVERTENCIA: La ejecución puede tardar varios minutos...")
+
+// --- Benchmark Producto Punto ---
+println("\n=== Benchmark: Producto Punto ===")
+val vectorSizesBench = List(10000, 100000, 1000000, 5000000) // Tamaños para benchmark
+println(f"${"Tamaño (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. ParD (ms)"}%15s | ${"Speedup"}%10s")
+println("-" * 65)
+for (n <- vectorSizesBench) {
+  println(s"Benchmarking Producto Punto n=$n...")
+  // La función compararProdPunto genera los vectores internamente
+  val (tSeq, tParD, speedup) = compararProdPunto(n)
+  println(f"$n%15d | $tSeq%15.4f | $tParD%15.4f | $speedup%9.2f x")
 }
 
-println("\n--- 2. Comparación de Multiplicación Recursiva (Secuencial vs Paralela Task) ---")
-if ((n & (n - 1)) == 0 && n > 0) { // Verifica si n es potencia de 2
-  try {
-    // CORREGIDO: Añadido '_' a los nombres de los métodos
-    val (tRecSec, tRecPar, speedupRec) = compararAlgoritmos(multMatrizRec _, multMatrizRecPar _)(m1, m2)
-    println(f"  Tiempo Recursiva Secuencial : $tRecSec%.4f ms")
-    println(f"  Tiempo Recursiva Paralela (Task): $tRecPar%.4f ms")
-    println(f"  Speedup (Sec/ParTask)         : $speedupRec%.2fx")
-  } catch {
-    case e: Throwable => println(s"  ERROR ejecutando benchmark recursivo: ${e.getMessage}")
-  }
-} else {
-  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2, requerido para algoritmos recursivos.")
+// --- Benchmark Multiplicación Matrices ---
+println("\n=== Benchmark: Multiplicación Matrices ===")
+// Tamaños potencia de 2. Ir aumentando con cuidado, 256 o 512 pueden ser lentos en worksheet.
+val matrixSizesBench = List(16, 32, 64, 128, 256)
+
+// Comparación 1: Estándar Seq vs Par
+println("\n--- Comparación: multMatriz vs multMatrizPar ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
+println("-" * 65)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatriz vs multMatrizPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatriz, multMatrizPar)(m1, m2)
+  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
-
-println("\n--- 3. Comparación de Multiplicación Strassen (Secuencial vs Paralela Task) ---")
-if ((n & (n - 1)) == 0 && n > 0) { // Verifica si n es potencia de 2
-  try {
-    // CORREGIDO: Añadido '_' a los nombres de los métodos
-    val (tStrSec, tStrPar, speedupStr) = compararAlgoritmos(multStrassen _, multStrassenPar _)(m1, m2)
-    println(f"  Tiempo Strassen Secuencial  : $tStrSec%.4f ms")
-    println(f"  Tiempo Strassen Paralela (Task): $tStrPar%.4f ms")
-    println(f"  Speedup (Sec/ParTask)         : $speedupStr%.2fx")
-  } catch {
-    case e: Throwable => println(s"  ERROR ejecutando benchmark Strassen: ${e.getMessage}")
-  }
-} else {
-  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2, requerido para Strassen.")
+// Comparación 2: Recursiva Seq vs Par (sin umbral)
+println("\n--- Comparación: multMatrizRec vs multMatrizRecPar (sin umbral) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
+println("-" * 65)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatrizRec vs multMatrizRecPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatrizRec, multMatrizRecPar)(m1, m2)
+  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x") // Esperar speedup < 1
 }
 
-
-println("\n--- 4. Comparación Multiplicación Estándar (Secuencial vs Paralela Datos) ---")
-// Usa la función específica compararMultMatriz que genera sus propias matrices.
-// No necesita '_' porque no pasa funciones como argumentos.
-try {
-  val (tStdSecD, tStdParD, speedupStdD) = compararMultMatriz(n)
-  println(f"  Tiempo Estándar Secuencial     : $tStdSecD%.4f ms")
-  println(f"  Tiempo Estándar Paralela (Datos): $tStdParD%.4f ms")
-  println(f"  Speedup (Sec/ParDatos)         : $speedupStdD%.2fx")
-} catch {
-  case e: Throwable => println(s"  ERROR ejecutando benchmark estándar (datos): ${e.getMessage}")
+// Comparación 3: Strassen Seq vs Par (sin umbral)
+println("\n--- Comparación: multStrassen vs multStrassenPar (sin umbral) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
+println("-" * 65)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multStrassen vs multStrassenPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multStrassen, multStrassenPar)(m1, m2)
+  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x") // Esperar speedup < 1
 }
 
-
-println("\n--- 5. Comparación Producto Punto (Secuencial vs Paralelo Datos) ---")
-// Usa la función específica compararProdPunto que genera sus propios vectores.
-// No necesita '_' porque no pasa funciones como argumentos.
-try {
-  val (tPPSec, tPPParD, speedupPP) = compararProdPunto(vectorSize)
-  println(f"  Tiempo Producto Punto Secuencial : $tPPSec%.4f ms")
-  println(f"  Tiempo Producto Punto Paralelo (Datos): $tPPParD%.4f ms")
-  println(f"  Speedup (Sec/ParDatos)           : $speedupPP%.2fx")
-} catch {
-  case e: Throwable => println(s"  ERROR ejecutando benchmark producto punto: ${e.getMessage}")
-}
-
-
-// --- Comparaciones Adicionales (Opcional) ---
-
-println("\n--- 6. Comparación Algoritmos Secuenciales (Estándar vs Recursivo vs Strassen) ---")
-if ((n & (n - 1)) == 0 && n > 0) { // Solo si n es potencia de 2
-  try {
-    // CORREGIDO: Añadido '_' a los nombres de los métodos
-    println("  Comparando Estándar Sec vs Recursiva Sec...")
-    val (tStdSec_vs_Rec, tRecSec_vs_Std, speedupStdVsRec) = compararAlgoritmos(multMatriz _, multMatrizRec _)(m1, m2)
-    println(f"    Estándar Sec  : $tStdSec_vs_Rec%.4f ms")
-    println(f"    Recursiva Sec : $tRecSec_vs_Std%.4f ms")
-    println(f"    Aceleración (Estándar / Recursiva): $speedupStdVsRec%.2fx")
-
-    // CORREGIDO: Añadido '_' a los nombres de los métodos
-    println("\n  Comparando Estándar Sec vs Strassen Sec...")
-    val (tStdSec_vs_Str, tStrSec_vs_Std, speedupStdVsStr) = compararAlgoritmos(multMatriz _, multStrassen _)(m1, m2)
-    println(f"    Estándar Sec : $tStdSec_vs_Str%.4f ms")
-    println(f"    Strassen Sec : $tStrSec_vs_Std%.4f ms")
-    println(f"    Aceleración (Estándar / Strassen): $speedupStdVsStr%.2fx")
-
-    // CORREGIDO: Añadido '_' a los nombres de los métodos
-    println("\n  Comparando Recursiva Sec vs Strassen Sec...")
-    val (tRecSec_vs_Str, tStrSec_vs_Rec, speedupRecVsStr) = compararAlgoritmos(multMatrizRec _, multStrassen _)(m1, m2)
-    println(f"    Recursiva Sec: $tRecSec_vs_Str%.4f ms")
-    println(f"    Strassen Sec : $tStrSec_vs_Rec%.4f ms")
-    println(f"    Aceleración (Recursiva / Strassen): $speedupRecVsStr%.2fx")
-
-  } catch {
-    case e: Throwable => println(s"  ERROR ejecutando benchmarks comparativos secuenciales: ${e.getMessage}")
-  }
-} else {
-  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2.")
+// Comparación 4: Estándar Seq vs Strassen Seq
+println("\n--- Comparación: multMatriz vs multStrassen ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Std (ms)"}%15s | ${"T. Strass (ms)"}%15s | ${"Ratio TStd/TStr"}%15s")
+println("-" * 70)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatriz vs multStrassen n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tStd, tStr, _) = compararAlgoritmos(multMatriz, multStrassen)(m1, m2) // Ignoramos speedup aquí
+  println(f"$n%15d | $tStd%15.4f | $tStr%15.4f | ${tStd / tStr}%14.2f x") // Ratio > 1 si Strassen es más rápido
 }
 
 
-println("\n--- Fin de Benchmarks ---")
+println("\n--- Fin Pruebas de Rendimiento ---")
