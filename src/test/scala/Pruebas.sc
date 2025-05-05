@@ -1,110 +1,139 @@
-// Importa todo del paquete Matrices (incluye el tipo Matriz y las funciones)
+// fichero: pruebas.sc
+
+import Benchmark._
 import Matrices._
-// Importa el conversor para poder usar .par en colecciones estándar
-import scala.collection.parallel.CollectionConverters._
-// Podrías importar Benchmark si quieres llamar a compararProdPunto aquí,
-// pero usualmente las pruebas de funcionamiento se hacen separadas del benchmarking.
-// import Benchmark._
+import org.scalameter._ // Necesario si usaras 'config' directamente aquí, aunque ya está encapsulado.
 
-println("--- Pruebas Taller 5: Multiplicación de Matrices y Producto Punto ---")
+println("--- Inicio de Benchmarks ---")
 
-// --- Crear Datos de Prueba ---
-// Matrices pequeñas (potencia de 2 para algoritmos recursivos/Strassen)
-val n_small = 4 // Dimensión pequeña (4x4)
-val vals_limit = 3 // Valores pequeños (0, 1, 2) para facilitar la inspección manual
+// --- Configuración ---
+// Define el tamaño de las matrices a probar.
+// ¡IMPORTANTE! Para multMatrizRec, multMatrizRecPar, multStrassen, multStrassenPar
+// 'n' DEBE ser una potencia de 2.
+val n: Int = 128 // Ejemplo: 64, 128, 256. Ajusta según sea necesario.
 
-val m1_small = matrizAlAzar(n_small, vals_limit)
-val m2_small = matrizAlAzar(n_small, vals_limit)
+// Define el tamaño de los vectores para el producto punto.
+val vectorSize: Int = 1000000 // Un tamaño grande para ver mejor el efecto del paralelismo.
 
-println(s"\nMatriz m1 ($n_small x $n_small):")
-m1_small.foreach(row => println(row.mkString("\t")))
-println(s"\nMatriz m2 ($n_small x $n_small):")
-m2_small.foreach(row => println(row.mkString("\t")))
+println(s"Configuración:")
+println(s" - Tamaño de Matriz (n x n): $n x $n")
+println(s" - Tamaño de Vector (producto punto): $vectorSize")
+// El rango de valores aleatorios se define dentro de matrizAlAzar/vectorAlAzar en el paquete Matrices (actualmente usa 'vals = 2').
 
-// Vectores pequeños
-val vec_len_small = 10
-val v1_small = vectorAlAzar(vec_len_small, vals_limit)
-val v2_small = vectorAlAzar(vec_len_small, vals_limit)
-
-println(s"\nVector v1 (longitud $vec_len_small): $v1_small")
-println(s"Vector v2 (longitud $vec_len_small): $v2_small")
-
-
-// --- Pruebas de Multiplicación de Matrices ---
-
-println("\n--- Probando Multiplicación Estándar ---")
-val res_multMatriz = multMatriz(m1_small, m2_small)
-println("Resultado multMatriz (Seq):")
-res_multMatriz.foreach(row => println(row.mkString("\t")))
-
-val res_multMatrizPar = multMatrizPar(m1_small, m2_small)
-println("\nResultado multMatrizPar (Par):")
-res_multMatrizPar.foreach(row => println(row.mkString("\t")))
-// Verificar si son iguales (deberían serlo si no hay errores)
-println(s"multMatriz == multMatrizPar: ${res_multMatriz == res_multMatrizPar}")
+// --- Generación de Datos para compararAlgoritmos ---
+// Generamos un par de matrices aquí para usarlas consistentemente en las comparaciones
+// que utilizan `compararAlgoritmos`. Las funciones `compararMultMatriz` y
+// `compararProdPunto` generan sus propios datos internamente.
+println(s"\nGenerando matrices aleatorias de ${n}x${n} para comparaciones...")
+// Asegúrate de que 'n' sea potencia de 2 si vas a usar Rec o Strassen.
+val m1 = matrizAlAzar(n, 10) // Usamos un rango pequeño para los valores, e.g., 10
+val m2 = matrizAlAzar(n, 10)
+println("Matrices generadas.")
 
 
-println("\n--- Probando Multiplicación Recursiva ---")
-val res_multMatrizRec = multMatrizRec(m1_small, m2_small)
-println("Resultado multMatrizRec (Seq):")
-res_multMatrizRec.foreach(row => println(row.mkString("\t")))
-// Verificar si es igual al estándar
-println(s"multMatriz == multMatrizRec: ${res_multMatriz == res_multMatrizRec}")
+// --- Ejecución de Benchmarks ---
+
+println("\n--- 1. Comparación de Multiplicación Estándar (Secuencial vs Paralela Task) ---")
+try {
+  // CORREGIDO: Añadido '_' a los nombres de los métodos
+  val (tStdSec, tStdParT, speedupStdT) = compararAlgoritmos(multMatriz _, multMatrizPar _)(m1, m2)
+  println(f"  Tiempo Estándar Secuencial : $tStdSec%.4f ms")
+  println(f"  Tiempo Estándar Paralela (Task): $tStdParT%.4f ms")
+  println(f"  Speedup (Sec/ParTask)       : $speedupStdT%.2fx")
+} catch {
+  case e: Throwable => println(s"  ERROR ejecutando benchmark estándar: ${e.getMessage}")
+}
+
+println("\n--- 2. Comparación de Multiplicación Recursiva (Secuencial vs Paralela Task) ---")
+if ((n & (n - 1)) == 0 && n > 0) { // Verifica si n es potencia de 2
+  try {
+    // CORREGIDO: Añadido '_' a los nombres de los métodos
+    val (tRecSec, tRecPar, speedupRec) = compararAlgoritmos(multMatrizRec _, multMatrizRecPar _)(m1, m2)
+    println(f"  Tiempo Recursiva Secuencial : $tRecSec%.4f ms")
+    println(f"  Tiempo Recursiva Paralela (Task): $tRecPar%.4f ms")
+    println(f"  Speedup (Sec/ParTask)         : $speedupRec%.2fx")
+  } catch {
+    case e: Throwable => println(s"  ERROR ejecutando benchmark recursivo: ${e.getMessage}")
+  }
+} else {
+  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2, requerido para algoritmos recursivos.")
+}
 
 
-// Para multMatrizRecPar y multStrassenPar, puedes ajustar el umbral si es necesario
-val umbral_rec = 2 // Umbral bajo para forzar paralelismo incluso en matriz 4x4
-val res_multMatrizRecPar = multMatrizRecPar(m1_small, m2_small, umbral_rec)
-println(s"\nResultado multMatrizRecPar (Par, umbral=$umbral_rec):")
-res_multMatrizRecPar.foreach(row => println(row.mkString("\t")))
-// Verificar si es igual al estándar
-println(s"multMatriz == multMatrizRecPar: ${res_multMatriz == res_multMatrizRecPar}")
+println("\n--- 3. Comparación de Multiplicación Strassen (Secuencial vs Paralela Task) ---")
+if ((n & (n - 1)) == 0 && n > 0) { // Verifica si n es potencia de 2
+  try {
+    // CORREGIDO: Añadido '_' a los nombres de los métodos
+    val (tStrSec, tStrPar, speedupStr) = compararAlgoritmos(multStrassen _, multStrassenPar _)(m1, m2)
+    println(f"  Tiempo Strassen Secuencial  : $tStrSec%.4f ms")
+    println(f"  Tiempo Strassen Paralela (Task): $tStrPar%.4f ms")
+    println(f"  Speedup (Sec/ParTask)         : $speedupStr%.2fx")
+  } catch {
+    case e: Throwable => println(s"  ERROR ejecutando benchmark Strassen: ${e.getMessage}")
+  }
+} else {
+  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2, requerido para Strassen.")
+}
 
 
-println("\n--- Probando Multiplicación Strassen ---")
-val res_multStrassen = multStrassen(m1_small, m2_small)
-println("Resultado multStrassen (Seq):")
-res_multStrassen.foreach(row => println(row.mkString("\t")))
-// Verificar si es igual al estándar
-println(s"multMatriz == multStrassen: ${res_multMatriz == res_multStrassen}")
+println("\n--- 4. Comparación Multiplicación Estándar (Secuencial vs Paralela Datos) ---")
+// Usa la función específica compararMultMatriz que genera sus propias matrices.
+// No necesita '_' porque no pasa funciones como argumentos.
+try {
+  val (tStdSecD, tStdParD, speedupStdD) = compararMultMatriz(n)
+  println(f"  Tiempo Estándar Secuencial     : $tStdSecD%.4f ms")
+  println(f"  Tiempo Estándar Paralela (Datos): $tStdParD%.4f ms")
+  println(f"  Speedup (Sec/ParDatos)         : $speedupStdD%.2fx")
+} catch {
+  case e: Throwable => println(s"  ERROR ejecutando benchmark estándar (datos): ${e.getMessage}")
+}
 
 
-// Para multMatrizRecPar y multStrassenPar, puedes ajustar el umbral si es necesario
-val umbral_strassen = 2 // Umbral bajo para forzar paralelismo
-val res_multStrassenPar = multStrassenPar(m1_small, m2_small, umbral_strassen)
-println(s"\nResultado multStrassenPar (Par, umbral=$umbral_strassen):")
-res_multStrassenPar.foreach(row => println(row.mkString("\t")))
-// Verificar si es igual al estándar
-println(s"multMatriz == multStrassenPar: ${res_multMatriz == res_multStrassenPar}")
+println("\n--- 5. Comparación Producto Punto (Secuencial vs Paralelo Datos) ---")
+// Usa la función específica compararProdPunto que genera sus propios vectores.
+// No necesita '_' porque no pasa funciones como argumentos.
+try {
+  val (tPPSec, tPPParD, speedupPP) = compararProdPunto(vectorSize)
+  println(f"  Tiempo Producto Punto Secuencial : $tPPSec%.4f ms")
+  println(f"  Tiempo Producto Punto Paralelo (Datos): $tPPParD%.4f ms")
+  println(f"  Speedup (Sec/ParDatos)           : $speedupPP%.2fx")
+} catch {
+  case e: Throwable => println(s"  ERROR ejecutando benchmark producto punto: ${e.getMessage}")
+}
 
 
-// --- Pruebas de Producto Punto ---
+// --- Comparaciones Adicionales (Opcional) ---
 
-println("\n--- Probando Producto Punto ---")
-val res_prodPunto = prodPunto(v1_small, v2_small)
-println(s"Resultado prodPunto (Seq): $res_prodPunto")
+println("\n--- 6. Comparación Algoritmos Secuenciales (Estándar vs Recursivo vs Strassen) ---")
+if ((n & (n - 1)) == 0 && n > 0) { // Solo si n es potencia de 2
+  try {
+    // CORREGIDO: Añadido '_' a los nombres de los métodos
+    println("  Comparando Estándar Sec vs Recursiva Sec...")
+    val (tStdSec_vs_Rec, tRecSec_vs_Std, speedupStdVsRec) = compararAlgoritmos(multMatriz _, multMatrizRec _)(m1, m2)
+    println(f"    Estándar Sec  : $tStdSec_vs_Rec%.4f ms")
+    println(f"    Recursiva Sec : $tRecSec_vs_Std%.4f ms")
+    println(f"    Aceleración (Estándar / Recursiva): $speedupStdVsRec%.2fx")
 
-// Crear versiones ParVector para prodPuntoParD
-val v1_par = v1_small.par
-val v2_par = v2_small.par
-val res_prodPuntoParD = prodPuntoParD(v1_par, v2_par)
-println(s"Resultado prodPuntoParD (Par): $res_prodPuntoParD")
-// Verificar si son iguales
-println(s"prodPunto == prodPuntoParD: ${res_prodPunto == res_prodPuntoParD}")
+    // CORREGIDO: Añadido '_' a los nombres de los métodos
+    println("\n  Comparando Estándar Sec vs Strassen Sec...")
+    val (tStdSec_vs_Str, tStrSec_vs_Std, speedupStdVsStr) = compararAlgoritmos(multMatriz _, multStrassen _)(m1, m2)
+    println(f"    Estándar Sec : $tStdSec_vs_Str%.4f ms")
+    println(f"    Strassen Sec : $tStrSec_vs_Std%.4f ms")
+    println(f"    Aceleración (Estándar / Strassen): $speedupStdVsStr%.2fx")
+
+    // CORREGIDO: Añadido '_' a los nombres de los métodos
+    println("\n  Comparando Recursiva Sec vs Strassen Sec...")
+    val (tRecSec_vs_Str, tStrSec_vs_Rec, speedupRecVsStr) = compararAlgoritmos(multMatrizRec _, multStrassen _)(m1, m2)
+    println(f"    Recursiva Sec: $tRecSec_vs_Str%.4f ms")
+    println(f"    Strassen Sec : $tStrSec_vs_Rec%.4f ms")
+    println(f"    Aceleración (Recursiva / Strassen): $speedupRecVsStr%.2fx")
+
+  } catch {
+    case e: Throwable => println(s"  ERROR ejecutando benchmarks comparativos secuenciales: ${e.getMessage}")
+  }
+} else {
+  println(s"  **Omitido**: El tamaño de la matriz n=$n no es potencia de 2.")
+}
 
 
-// --- Prueba Opcional: Multiplicación con Paralelismo de Datos ---
-// (Necesaria para Benchmark.compararMultMatriz)
-println("\n--- Probando Multiplicación (Paralelismo Datos Puros) ---")
-val m1_parD = transformToParD(m1_small)
-val m2_parD = transformToParD(m2_small)
-val res_multMatrizParD = multMatrizParD(m1_parD, m2_parD)
-// Convertir resultado ParVector a Vector para comparación fácil
-val res_multMatrizParD_seq: Matriz = res_multMatrizParD.map(_.seq).seq
-println("Resultado multMatrizParD (Par Data):")
-res_multMatrizParD_seq.foreach(row => println(row.mkString("\t")))
-// Verificar si es igual al estándar
-println(s"multMatriz == multMatrizParD: ${res_multMatriz == res_multMatrizParD_seq}")
-
-
-println("\n--- Fin de las Pruebas ---")
+println("\n--- Fin de Benchmarks ---")

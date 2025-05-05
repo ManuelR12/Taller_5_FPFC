@@ -1,8 +1,8 @@
 import scala.util.Random
 import scala.collection.parallel.immutable.ParVector
 import scala.collection.parallel.CollectionConverters._
-import common._
-import java.util.concurrent.ForkJoinTask
+import java.util.concurrent.ForkJoinTask // Necesario para el tipo devuelto por common.task
+import common._ // Contiene task y parallel basados en ForkJoinPool
 
 package object Matrices {
   val random = new Random()
@@ -93,22 +93,19 @@ package object Matrices {
     Vector.tabulate(n, p)((i, j) => prodPunto(m1(i), m2trans(j)))
   }
 
-  // 1.1.2 Paralela (Refactorizada para usar common.task)
+  // 1.1.2 Paralela (Usa common.task, sin cambios)
   def multMatrizPar(m1: Matriz, m2: Matriz): Matriz = {
     require(m1.length == m2.length && m1.headOption.forall(_.length == m1.length), "Requiere matrices cuadradas de igual dimensión") // Asumiendo cuadradas para simplificar
     val m2trans = transpuesta(m2)
     val n = m1.length
 
-    // 1. Crear secuencia de Tareas T_i usando common.task
     val tasks: Seq[ForkJoinTask[Vector[Int]]] =
       for (i <- 0 until n) yield {
-        task { // common.task
-          Vector.tabulate(n)(j => prodPunto(m1(i), m2trans(j))) // Calcula ROW_i
+        task {
+          Vector.tabulate(n)(j => prodPunto(m1(i), m2trans(j)))
         }
       }
-    // 2. Obtener resultados esperando (join)
     val resultRows: Seq[Vector[Int]] = tasks.map(_.join())
-    // 3. Ensamblar C
     resultRows.toVector
   }
 
@@ -144,36 +141,38 @@ package object Matrices {
     }
   }
 
-  // 1.2.4 Paralela (Usa common.task, sin cambios respecto a la versión anterior que ya lo usaba)
-  def multMatrizRecPar(m1: Matriz, m2: Matriz, umbral: Int = 16): Matriz = {
+  // 1.2.4 Paralela (Refactorizada SIN UMBRAL)
+  def multMatrizRecPar(m1: Matriz, m2: Matriz): Matriz = {
     require(m1.length == m1(0).length && m2.length == m2(0).length && m1.length == m2.length, "Matrices deben ser cuadradas y de igual dimensión")
     require(m1.nonEmpty && (m1.length & (m1.length - 1)) == 0, "Dimensión debe ser potencia de 2")
 
     val n = m1.length
-    if (n <= umbral) {
-      multMatriz(m1, m2) // Base secuencial eficiente
+    if (n == 1) {
+      // CASO BASE: Solo se ejecuta cuando n=1
+      Vector(Vector(m1(0)(0) * m2(0)(0)))
     } else {
+      // CASO RECURSIVO PARALELO (siempre divide si n > 1)
       val l = n / 2
       val a11 = subMatriz(m1, 0, 0, l); val a12 = subMatriz(m1, 0, l, l)
       val a21 = subMatriz(m1, l, 0, l); val a22 = subMatriz(m1, l, l, l)
       val b11 = subMatriz(m2, 0, 0, l); val b12 = subMatriz(m2, 0, l, l)
       val b21 = subMatriz(m2, l, 0, l); val b22 = subMatriz(m2, l, l, l)
 
-      // Calcular productos intermedios en paralelo usando 'task'
-      val p1 = task { multMatrizRecPar(a11, b11, umbral) }
-      val p2 = task { multMatrizRecPar(a12, b21, umbral) }
-      val p3 = task { multMatrizRecPar(a11, b12, umbral) }
-      val p4 = task { multMatrizRecPar(a12, b22, umbral) }
-      val p5 = task { multMatrizRecPar(a21, b11, umbral) }
-      val p6 = task { multMatrizRecPar(a22, b21, umbral) }
-      val p7 = task { multMatrizRecPar(a21, b12, umbral) }
-      val p8 = task { multMatrizRecPar(a22, b22, umbral) }
+      // Lanzar las 8 multiplicaciones como tareas paralelas
+      val t1 = task { multMatrizRecPar(a11, b11) } // Llamada recursiva SIN umbral
+      val t2 = task { multMatrizRecPar(a12, b21) }
+      val t3 = task { multMatrizRecPar(a11, b12) }
+      val t4 = task { multMatrizRecPar(a12, b22) }
+      val t5 = task { multMatrizRecPar(a21, b11) }
+      val t6 = task { multMatrizRecPar(a22, b21) }
+      val t7 = task { multMatrizRecPar(a21, b12) }
+      val t8 = task { multMatrizRecPar(a22, b22) }
 
-      // Sincronizar y sumar
-      val c11 = sumMatriz(p1.join(), p2.join())
-      val c12 = sumMatriz(p3.join(), p4.join())
-      val c21 = sumMatriz(p5.join(), p6.join())
-      val c22 = sumMatriz(p7.join(), p8.join())
+      // Sincronizar (join) y sumar
+      val c11 = sumMatriz(t1.join(), t2.join())
+      val c12 = sumMatriz(t3.join(), t4.join())
+      val c21 = sumMatriz(t5.join(), t6.join())
+      val c22 = sumMatriz(t7.join(), t8.join())
 
       // Ensamblar la matriz resultado
       Vector.tabulate(n, n) { (i, j) =>
@@ -227,15 +226,17 @@ package object Matrices {
     }
   }
 
-  // 1.3.3 Paralela (Usa common.task, sin cambios respecto a la versión anterior que ya lo usaba)
-  def multStrassenPar(m1: Matriz, m2: Matriz, umbral: Int = 64): Matriz = {
+  // 1.3.3 Paralela (Refactorizada SIN UMBRAL)
+  def multStrassenPar(m1: Matriz, m2: Matriz): Matriz = {
     require(m1.length == m1(0).length && m2.length == m2(0).length && m1.length == m2.length, "Matrices deben ser cuadradas y de igual dimensión")
     require(m1.nonEmpty && (m1.length & (m1.length - 1)) == 0, "Dimensión debe ser potencia de 2")
 
     val n = m1.length
-    if (n <= umbral) {
-      multMatriz(m1, m2) // Base secuencial eficiente
+    if (n == 1) {
+      // CASO BASE: Solo se ejecuta cuando n=1
+      Vector(Vector(m1(0)(0) * m2(0)(0)))
     } else {
+      // CASO RECURSIVO PARALELO (siempre divide si n > 1)
       val l = n / 2
       val a11 = subMatriz(m1, 0, 0, l); val a12 = subMatriz(m1, 0, l, l)
       val a21 = subMatriz(m1, l, 0, l); val a22 = subMatriz(m1, l, l, l)
@@ -250,13 +251,13 @@ package object Matrices {
       val s9 = restaMatriz(a11, a21); val s10 = sumMatriz(b11, b12)
 
       // Calcular P1 a P7 en paralelo usando 'task'
-      val p1 = task { multStrassenPar(a11, s1, umbral) }
-      val p2 = task { multStrassenPar(s2, b22, umbral) }
-      val p3 = task { multStrassenPar(s3, b11, umbral) }
-      val p4 = task { multStrassenPar(a22, s4, umbral) }
-      val p5 = task { multStrassenPar(s5, s6, umbral) }
-      val p6 = task { multStrassenPar(s7, s8, umbral) }
-      val p7 = task { multStrassenPar(s9, s10, umbral) }
+      val p1 = task { multStrassenPar(a11, s1) } // Llamada recursiva SIN umbral
+      val p2 = task { multStrassenPar(s2, b22) }
+      val p3 = task { multStrassenPar(s3, b11) }
+      val p4 = task { multStrassenPar(a22, s4) }
+      val p5 = task { multStrassenPar(s5, s6) }
+      val p6 = task { multStrassenPar(s7, s8) }
+      val p7 = task { multStrassenPar(s9, s10) }
 
       // Sincronizar y calcular C
       val c11 = sumMatriz(restaMatriz(sumMatriz(p5.join(), p4.join()), p2.join()), p6.join())
@@ -274,4 +275,4 @@ package object Matrices {
     }
   }
 
-} // Fin package object Matrices
+}

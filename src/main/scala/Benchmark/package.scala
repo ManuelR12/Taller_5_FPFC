@@ -65,4 +65,5 @@ package object Benchmark {
     val speedUp= timeA1.value/timeA2.value
     (timeA1.value, timeA2.value, speedUp)
   }
+
 }
