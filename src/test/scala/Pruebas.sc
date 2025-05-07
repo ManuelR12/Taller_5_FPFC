@@ -115,17 +115,5 @@ for (n <- matrixSizesBench) {
   println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x") // Esperar speedup < 1
 }
 
-// Comparación 4: Estándar Seq vs Strassen Seq
-println("\n--- Comparación: multMatriz vs multStrassen ---")
-println(f"${"Dimensión (n)"}%15s | ${"T. Std (ms)"}%15s | ${"T. Strass (ms)"}%15s | ${"Ratio TStd/TStr"}%15s")
-println("-" * 70)
-for (n <- matrixSizesBench) {
-  println(s"Benchmarking multMatriz vs multStrassen n=$n...")
-  val m1 = matrizAlAzar(n, 2)
-  val m2 = matrizAlAzar(n, 2)
-  val (tStd, tStr, _) = compararAlgoritmos(multMatriz, multStrassen)(m1, m2) // Ignoramos speedup aquí
-  println(f"$n%15d | $tStd%15.4f | $tStr%15.4f | ${tStd / tStr}%14.2f x") // Ratio > 1 si Strassen es más rápido
-}
-
 
 println("\n--- Fin Pruebas de Rendimiento ---")
