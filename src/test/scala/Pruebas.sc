@@ -985,8 +985,8 @@ for (n <- matrixSizesBench) {
   println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
-// Comparación 1.2: Recursiva Seq vs Par (sin umbral)
-println("\n--- Comparación: multMatrizRec vs multMatrizRecPar (sin umbral) ---")
+// Comparación 1.2: Recursiva Seq vs Par
+println("\n--- Comparación: multMatrizRec vs multMatrizRecPar ---")
 println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
 println("-" * 65)
 for (n <- matrixSizesBench) {
@@ -997,8 +997,8 @@ for (n <- matrixSizesBench) {
   println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
-// Comparación 1.3: Strassen Seq vs Par (sin umbral)
-println("\n--- Comparación: multStrassen vs multStrassenPar (sin umbral) ---")
+// Comparación 1.3: Strassen Seq vs Par
+println("\n--- Comparación: multStrassen vs multStrassenPar ---")
 println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
 println("-" * 65)
 for (n <- matrixSizesBench) {
