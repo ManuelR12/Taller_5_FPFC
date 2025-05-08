@@ -951,7 +951,6 @@ println("-------------------------------------------------")
 //       Estos son resultados preliminares para el informe.
 //       ¡La ejecución puede tardar bastante!
 // ========================================================================
-
 println("\n--- Pruebas de Rendimiento (Benchmark) ---")
 println("ADVERTENCIA: La ejecución puede tardar varios minutos...")
 
@@ -969,10 +968,12 @@ for (n <- vectorSizesBench) {
 
 // --- Benchmark Multiplicación Matrices ---
 println("\n=== Benchmark: Multiplicación Matrices ===")
-// Tamaños potencia de 2. Ir aumentando con cuidado, 256 o 512 pueden ser lentos en worksheet.
+// Tamaños potencia de 2.
 val matrixSizesBench = List(16, 32, 64, 128, 256)
 
-// Comparación 1: Estándar Seq vs Par
+// --- Bloque 1: Comparaciones Secuencial vs Paralela para cada algoritmo ---
+
+// Comparación 1.1: Estándar Seq vs Par
 println("\n--- Comparación: multMatriz vs multMatrizPar ---")
 println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
 println("-" * 65)
@@ -980,11 +981,11 @@ for (n <- matrixSizesBench) {
   println(s"Benchmarking multMatriz vs multMatrizPar n=$n...")
   val m1 = matrizAlAzar(n, 2)
   val m2 = matrizAlAzar(n, 2)
-  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatriz, multMatrizPar)(m1, m2)
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatriz _, multMatrizPar _)(m1, m2)
   println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
-// Comparación 2: Recursiva Seq vs Par (sin umbral)
+// Comparación 1.2: Recursiva Seq vs Par (sin umbral)
 println("\n--- Comparación: multMatrizRec vs multMatrizRecPar (sin umbral) ---")
 println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
 println("-" * 65)
@@ -992,11 +993,11 @@ for (n <- matrixSizesBench) {
   println(s"Benchmarking multMatrizRec vs multMatrizRecPar n=$n...")
   val m1 = matrizAlAzar(n, 2)
   val m2 = matrizAlAzar(n, 2)
-  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatrizRec, multMatrizRecPar)(m1, m2)
-  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x") // Esperar speedup < 1
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multMatrizRec _, multMatrizRecPar _)(m1, m2)
+  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
-// Comparación 3: Strassen Seq vs Par (sin umbral)
+// Comparación 1.3: Strassen Seq vs Par (sin umbral)
 println("\n--- Comparación: multStrassen vs multStrassenPar (sin umbral) ---")
 println(f"${"Dimensión (n)"}%15s | ${"T. Seq (ms)"}%15s | ${"T. Par (ms)"}%15s | ${"Speedup"}%10s")
 println("-" * 65)
@@ -1004,9 +1005,84 @@ for (n <- matrixSizesBench) {
   println(s"Benchmarking multStrassen vs multStrassenPar n=$n...")
   val m1 = matrizAlAzar(n, 2)
   val m2 = matrizAlAzar(n, 2)
-  val (tSeq, tPar, speedup) = compararAlgoritmos(multStrassen, multStrassenPar)(m1, m2)
-  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x") // Esperar speedup < 1
+  val (tSeq, tPar, speedup) = compararAlgoritmos(multStrassen _, multStrassenPar _)(m1, m2)
+  println(f"$n%15d | $tSeq%15.4f | $tPar%15.4f | $speedup%9.2f x")
 }
 
+// --- Bloque 2: Comparaciones entre algoritmos SECUENCIALES ---
+
+// Comparación 2.1: Estándar Secuencial vs Recursiva Secuencial
+println("\n--- Comparación: multMatriz (Seq) vs multMatrizRec (Seq) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Std (ms)"}%15s | ${"T. Rec (ms)"}%15s | ${"Ratio Std/Rec"}%15s")
+println("-" * 70)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatriz (Seq) vs multMatrizRec (Seq) n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tStd, tRec, ratio) = compararAlgoritmos(multMatriz _, multMatrizRec _)(m1, m2)
+  println(f"$n%15d | $tStd%15.4f | $tRec%15.4f | $ratio%14.2f x")
+}
+
+// Comparación 2.2: Estándar Secuencial vs Strassen Secuencial
+println("\n--- Comparación: multMatriz (Seq) vs multStrassen (Seq) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Std (ms)"}%15s | ${"T. Strass(ms)"}%15s | ${"Ratio Std/Strass"}%18s")
+println("-" * 73)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatriz (Seq) vs multStrassen (Seq) n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tStd, tStrassen, ratio) = compararAlgoritmos(multMatriz _, multStrassen _)(m1, m2)
+  println(f"$n%15d | $tStd%15.4f | $tStrassen%15.4f | $ratio%17.2f x")
+}
+
+// Comparación 2.3: Recursiva Secuencial vs Strassen Secuencial
+println("\n--- Comparación: multMatrizRec (Seq) vs multStrassen (Seq) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. Rec (ms)"}%15s | ${"T. Strass(ms)"}%15s | ${"Ratio Rec/Strass"}%18s")
+println("-" * 73)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatrizRec (Seq) vs multStrassen (Seq) n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tRec, tStrassen, ratio) = compararAlgoritmos(multMatrizRec _, multStrassen _)(m1, m2)
+  println(f"$n%15d | $tRec%15.4f | $tStrassen%15.4f | $ratio%17.2f x")
+}
+
+// --- Bloque 3: Comparaciones entre algoritmos PARALELOS (Task) ---
+
+// Comparación 3.1: Estándar Paralela vs Recursiva Paralela
+println("\n--- Comparación: multMatrizPar (Par) vs multMatrizRecPar (Par) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. StdPar(ms)"}%15s | ${"T. RecPar(ms)"}%15s | ${"Ratio StdPar/RecPar"}%20s")
+println("-" * 78)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatrizPar vs multMatrizRecPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tStdPar, tRecPar, ratio) = compararAlgoritmos(multMatrizPar _, multMatrizRecPar _)(m1, m2)
+  println(f"$n%15d | $tStdPar%15.4f | $tRecPar%15.4f | $ratio%19.2f x")
+}
+
+// Comparación 3.2: Estándar Paralela vs Strassen Paralela
+println("\n--- Comparación: multMatrizPar (Par) vs multStrassenPar (Par) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. StdPar(ms)"}%15s | ${"T. StrassP(ms)"}%15s | ${"Ratio StdPar/StrassP"}%22s")
+println("-" * 80)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatrizPar vs multStrassenPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tStdPar, tStrassenPar, ratio) = compararAlgoritmos(multMatrizPar _, multStrassenPar _)(m1, m2)
+  println(f"$n%15d | $tStdPar%15.4f | $tStrassenPar%15.4f | $ratio%21.2f x")
+}
+
+// Comparación 3.3: Recursiva Paralela vs Strassen Paralela
+println("\n--- Comparación: multMatrizRecPar (Par) vs multStrassenPar (Par) ---")
+println(f"${"Dimensión (n)"}%15s | ${"T. RecPar(ms)"}%15s | ${"T. StrassP(ms)"}%15s | ${"Ratio RecPar/StrassP"}%22s")
+println("-" * 80)
+for (n <- matrixSizesBench) {
+  println(s"Benchmarking multMatrizRecPar vs multStrassenPar n=$n...")
+  val m1 = matrizAlAzar(n, 2)
+  val m2 = matrizAlAzar(n, 2)
+  val (tRecPar, tStrassenPar, ratio) = compararAlgoritmos(multMatrizRecPar _, multStrassenPar _)(m1, m2)
+  println(f"$n%15d | $tRecPar%15.4f | $tStrassenPar%15.4f | $ratio%21.2f x")
+}
 
 println("\n--- Fin Pruebas de Rendimiento ---")
